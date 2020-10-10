@@ -11,9 +11,11 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 
-# from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.firefox.options import Options
-from webdriver_manager.firefox import GeckoDriverManager
+# from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.chrome.options import Options
+
+# from webdriver_manager.firefox import GeckoDriverManager
+from webdriver_manager.chrome import ChromeDriverManager
 
 CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
 YOUTUBE_BASE_URL = "https://www.youtube.com"
@@ -150,8 +152,8 @@ def main(api_key=None):
 if __name__ == "__main__":
     options = Options()
     options.headless = True
-    driver = webdriver.Firefox(
-        executable_path=GeckoDriverManager().install(), options=options
+    driver = webdriver.Chrome(
+        executable_path=ChromeDriverManager().install(), options=options
     )
     # todo: ApyKey from json file
     #       testing
