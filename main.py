@@ -2,9 +2,11 @@ import os
 import re
 import shutil
 import time
+from urllib.parse import urljoin
 
 import pafy
 import requests
+from itertools import count
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
@@ -14,7 +16,7 @@ from selenium.webdriver.firefox.options import Options
 from webdriver_manager.firefox import GeckoDriverManager
 
 CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
-YOUTUBE_BASE_URL = "https://www.youtube.com/"
+YOUTUBE_BASE_URL = "https://www.youtube.com"
 
 
 def make_soup(url):
@@ -58,7 +60,7 @@ def get_channel_from_user():
 
 
 def retrieve_all_videos(link):
-    link = link.strip("/") + "/videos"
+    link = urljoin(link, "videos")
     try:
         driver.get(link)
         time.sleep(5)
@@ -66,15 +68,13 @@ def retrieve_all_videos(link):
         screen_height = driver.execute_script(
             "return window.screen.height;"
         )
-        i = 1
 
-        while True:
+        for i in count(1):
             driver.execute_script(
                 "window.scrollTo(0, {screen_height}*{i});".format(
                     screen_height=screen_height, i=i
                 )
             )
-            i += 1
             time.sleep(scroll_pause_time)
             scroll_height = driver.execute_script(
                 "return document.documentElement.scrollHeight"
@@ -83,16 +83,12 @@ def retrieve_all_videos(link):
                 break
 
         videos_page_soup = BeautifulSoup(driver.page_source, "html.parser")
-
-        all_as = videos_page_soup.findAll("a", attrs={"id": "thumbnail"})
-        videos_urls = []
-        for A in all_as:
-            try:
-                videos_urls.append(YOUTUBE_BASE_URL.strip("/") + A["href"])
-            except KeyError:
-                pass
-
-        return videos_urls
+        all_a_tags = videos_page_soup.findAll("a", attrs={"id": "thumbnail"})
+        return [
+            urljoin(YOUTUBE_BASE_URL, href)
+            for tag in all_a_tags
+            if (href := tag.get("href"))
+        ]
     except ConnectionRefusedError:
         print("External connection occurred. Try again later.")
 
@@ -120,7 +116,7 @@ def download_video(video_link, api_key=None):
         pass
 
 
-def main():
+def main(api_key=None):
     channel_url = get_channel_from_user()
     try:
         channel_name = make_soup(channel_url).get("title")
@@ -145,7 +141,7 @@ def main():
         os.mkdir(channel_name)
         os.chdir(channel_name)
         for video_url in all_videos_urls:
-            download_video(video_url)
+            download_video(video_url, api_key=None)
 
     driver.quit()
     print("Finished!")
@@ -157,4 +153,6 @@ if __name__ == "__main__":
     driver = webdriver.Firefox(
         executable_path=GeckoDriverManager().install(), options=options
     )
+    # todo: ApyKey from json file
+    #       testing
     main()
