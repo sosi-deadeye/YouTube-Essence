@@ -22,7 +22,7 @@ options.headless = True
 driver = webdriver.Firefox(
     executable_path=GeckoDriverManager().install(), options=options
 )
-channelUrl = ""
+channel_url = ""
 channelName = ""
 
 
@@ -35,7 +35,7 @@ def make_soup(url):
         exit(-1)
 
 
-def validateChannelUrl(link):
+def validate_channel_url(link):
     global driver
 
     if (
@@ -62,15 +62,15 @@ def validateChannelUrl(link):
     return True
 
 
-def getChannelFromUser():
-    global channelUrl
-    channelUrl = input("Enter the channel's url: ").strip()
-    while not validateChannelUrl(channelUrl):
-        channelUrl = input("Enter the channel's url: ").strip()
-    return channelUrl
+def get_channel_from_user():
+    global channel_url
+    channel_url = input("Enter the channel's url: ").strip()
+    while not validate_channel_url(channel_url):
+        channel_url = input("Enter the channel's url: ").strip()
+    return channel_url
 
 
-def retrieveAllVideos(link):
+def retrieve_all_videos(link):
     global driver
     link = link.strip("/") + "/videos"
     try:
@@ -101,24 +101,24 @@ def retrieveAllVideos(link):
             if screen_height * i > scroll_height:
                 break
 
-        videosPageSoup = BeautifulSoup(driver.page_source, "html.parser")
+        videos_page_soup = BeautifulSoup(driver.page_source, "html.parser")
 
-        allAs = videosPageSoup.findAll("a", attrs={"id": "thumbnail"})
-        videosUrls = []
-        for A in allAs:
+        all_as = videos_page_soup.findAll("a", attrs={"id": "thumbnail"})
+        videos_urls = []
+        for A in all_as:
             try:
-                videosUrls.append(YOUTUBE_BASE_URL.strip("/") + A["href"])
+                videos_urls.append(YOUTUBE_BASE_URL.strip("/") + A["href"])
 
             except KeyError:
                 pass
 
-        return videosUrls
+        return videos_urls
     except ConnectionRefusedError:
         print("External connection occured. Try again later.")
         exit(-1)
 
 
-def downloadVideo(videoLink):
+def download_video(video_link):
     try:
 
         # Specifying an API key is optional
@@ -126,22 +126,22 @@ def downloadVideo(videoLink):
         # it is prefered that software calling pafy provides it’s own API key,
         # and the default may be removed in the future.
         pafy.set_api_key(yourApiKey)
-        ytbVideo = pafy.new(videoLink)
+        youtube_video = pafy.new(video_link)
 
-        stream = ytbVideo.getbest(preftype="mp4")
+        stream = youtube_video.getbest(preftype="mp4")
         stream.download()
-        print(ytbVideo.title, " downloaded...")
+        print(youtube_video.title, " downloaded...")
     except OSError:  # if the video is labeled as private, then an error would occur and we won't be able to extract it
         pass
 
 
 def main():
-    global channelUrl
+    global channel_url
     global channelName
     global driver
-    channelUrl = getChannelFromUser().strip("/")
+    channel_url = get_channel_from_user().strip("/")
     try:
-        channelName = make_soup(channelUrl).get("title")
+        channelName = make_soup(channel_url).get("title")
 
     except TimeoutException:
         print("This is taking too long, unable to proceed...")
@@ -149,15 +149,15 @@ def main():
 
     channelName = driver.title.replace("- YouTube", "").strip()
     print("Channel ", channelName, " retreived successfully....")
-    allVideosUrls = retrieveAllVideos(channelUrl)
+    all_videos_urls = retrieve_all_videos(channel_url)
 
-    print("Channel contains ", len(allVideosUrls), " videos.")
-    userChoice = input("Want to download them all or abort? Y/N ")
+    print("Channel contains ", len(all_videos_urls), " videos.")
+    user_choice = input("Want to download them all or abort? Y/N ")
 
-    while userChoice.upper() not in ["Y", "N"]:
-        userChoice = input("Wrong choice. Download all or abort ? Y/N ")
+    while user_choice.upper() not in ["Y", "N"]:
+        user_choice = input("Wrong choice. Download all or abort ? Y/N ")
 
-    if userChoice.upper() == "N":
+    if user_choice.upper() == "N":
         print("Ciao")
         exit(0)
     else:
@@ -165,8 +165,8 @@ def main():
             shutil.rmtree(channelName)  # delete directory with its contents
         os.mkdir(channelName)
         os.chdir(channelName)
-        for videoUrl in allVideosUrls:
-            downloadVideo(videoUrl)
+        for videoUrl in all_videos_urls:
+            download_video(videoUrl)
 
         driver.quit()
 
