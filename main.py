@@ -1,20 +1,16 @@
 import os
+import re
 import shutil
 import time
 
-import re
-
 import pafy
-
 import requests
-
 from bs4 import BeautifulSoup
-
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
+
 # from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.firefox.options import Options
-
 from webdriver_manager.firefox import GeckoDriverManager
 
 CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
@@ -23,9 +19,11 @@ YOUTUBE_BASE_URL = "https://www.youtube.com/"
 options = Options()
 options.headless = True
 # driver = webdriver.Chrome(executable_path=ChromeDriverManager.install(), chrome_options=options)
-driver = webdriver.Firefox(executable_path=GeckoDriverManager().install(), options=options)
-channelUrl = ''
-channelName = ''
+driver = webdriver.Firefox(
+    executable_path=GeckoDriverManager().install(), options=options
+)
+channelUrl = ""
+channelName = ""
 
 
 def make_soup(url):
@@ -40,7 +38,13 @@ def make_soup(url):
 def validateChannelUrl(link):
     global driver
 
-    if re.match("^((http|https)://)(www\.)youtube\.com/(channel/|user/|c/)[a-zA-Z0-9\-]{1,}$", link) is None:
+    if (
+        re.match(
+            r"^((http|https)://)(www\.)youtube\.com/(channel/|user/|c/)[a-zA-Z0-9\-]+$",
+            link,
+        )
+        is None
+    ):
         print("Wrong channel URL")
         print("Try including the whole URL starting by http/https...")
         return False
@@ -73,17 +77,25 @@ def retrieveAllVideos(link):
         driver.get(link)
         time.sleep(5)
         scroll_pause_time = 1
-        screen_height = driver.execute_script("return window.screen.height;")  # get the screen height of the web
+        screen_height = driver.execute_script(
+            "return window.screen.height;"
+        )  # get the screen height of the web
         i = 1
 
         while True:
 
             # scroll one screen height each time
-            driver.execute_script("window.scrollTo(0, {screen_height}*{i});".format(screen_height=screen_height, i=i))
+            driver.execute_script(
+                "window.scrollTo(0, {screen_height}*{i});".format(
+                    screen_height=screen_height, i=i
+                )
+            )
             i += 1
             time.sleep(scroll_pause_time)
             # update scroll height each time after scrolled, as the scroll height can change after we scrolled the page
-            scroll_height = driver.execute_script("return document.documentElement.scrollHeight")
+            scroll_height = driver.execute_script(
+                "return document.documentElement.scrollHeight"
+            )
 
             # Break the loop when the height we need to scroll to is larger than the total scroll height
             if screen_height * i > scroll_height:
@@ -91,12 +103,11 @@ def retrieveAllVideos(link):
 
         videosPageSoup = BeautifulSoup(driver.page_source, "html.parser")
 
-        allAs = videosPageSoup.findAll('a', attrs={"id": "thumbnail"})
+        allAs = videosPageSoup.findAll("a", attrs={"id": "thumbnail"})
         videosUrls = []
         for A in allAs:
             try:
                 videosUrls.append(YOUTUBE_BASE_URL.strip("/") + A["href"])
-
 
             except KeyError:
                 pass
@@ -136,7 +147,7 @@ def main():
         print("This is taking too long, unable to proceed...")
         exit(-1)
 
-    channelName = driver.title.replace("- YouTube", '').strip()
+    channelName = driver.title.replace("- YouTube", "").strip()
     print("Channel ", channelName, " retreived successfully....")
     allVideosUrls = retrieveAllVideos(channelUrl)
 
