@@ -31,7 +31,7 @@ def make_soup(url):
         response = requests.get(url)
         return BeautifulSoup(response.content, "html.parser")
     except:
-        print("An error occured. Cannot proceed...")
+        print("An error occurred. Cannot proceed...")
         exit(-1)
 
 
@@ -57,7 +57,7 @@ def validate_channel_url(link):
         exit(-1)
 
     if driver.current_url == "https://www.youtube.com/error?src=404":
-        print("Non existant channel")
+        print("Non existent channel")
         return False
     return True
 
@@ -148,7 +148,7 @@ def main():
         exit(-1)
 
     channelName = driver.title.replace("- YouTube", "").strip()
-    print("Channel ", channelName, " retreived successfully....")
+    print("Channel ", channelName, " retrieved successfully....")
     all_videos_urls = retrieve_all_videos(channel_url)
 
     print("Channel contains ", len(all_videos_urls), " videos.")
