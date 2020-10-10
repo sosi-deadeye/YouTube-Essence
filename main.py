@@ -114,7 +114,7 @@ def retrieve_all_videos(link):
 
         return videos_urls
     except ConnectionRefusedError:
-        print("External connection occured. Try again later.")
+        print("External connection occurred. Try again later.")
         exit(-1)
 
 
@@ -123,7 +123,7 @@ def download_video(video_link):
 
         # Specifying an API key is optional
         # , as pafy includes one. However,
-        # it is prefered that software calling pafy provides it’s own API key,
+        # it is preferred that software calling pafy provides it’s own API key,
         # and the default may be removed in the future.
         pafy.set_api_key(yourApiKey)
         youtube_video = pafy.new(video_link)
