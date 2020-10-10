@@ -65,12 +65,10 @@ def retrieve_all_videos(link):
         scroll_pause_time = 1
         screen_height = driver.execute_script(
             "return window.screen.height;"
-        )  # get the screen height of the web
+        )
         i = 1
 
         while True:
-
-            # scroll one screen height each time
             driver.execute_script(
                 "window.scrollTo(0, {screen_height}*{i});".format(
                     screen_height=screen_height, i=i
@@ -78,12 +76,9 @@ def retrieve_all_videos(link):
             )
             i += 1
             time.sleep(scroll_pause_time)
-            # update scroll height each time after scrolled, as the scroll height can change after we scrolled the page
             scroll_height = driver.execute_script(
                 "return document.documentElement.scrollHeight"
             )
-
-            # Break the loop when the height we need to scroll to is larger than the total scroll height
             if screen_height * i > scroll_height:
                 break
 
@@ -94,7 +89,6 @@ def retrieve_all_videos(link):
         for A in all_as:
             try:
                 videos_urls.append(YOUTUBE_BASE_URL.strip("/") + A["href"])
-
             except KeyError:
                 pass
 
@@ -127,15 +121,6 @@ def download_video(video_link, api_key=None):
 
 
 def main():
-    options = Options()
-    options.headless = True
-    # driver = webdriver.Chrome(executable_path=ChromeDriverManager.install(), chrome_options=options)
-    driver = webdriver.Firefox(
-        executable_path=GeckoDriverManager().install(), options=options
-    )
-    channel_url = ""
-    channelName = ""
-
     channel_url = get_channel_from_user()
     try:
         channel_name = make_soup(channel_url).get("title")
@@ -143,7 +128,6 @@ def main():
         print("This is taking too long, unable to proceed...")
         return 1
 
-    channel_name = driver.title.replace("- YouTube", "").strip()
     print("Channel ", channel_name, " retrieved successfully....")
     all_videos_urls = retrieve_all_videos(channel_url)
 
@@ -168,4 +152,9 @@ def main():
 
 
 if __name__ == "__main__":
+    options = Options()
+    options.headless = True
+    driver = webdriver.Firefox(
+        executable_path=GeckoDriverManager().install(), options=options
+    )
     main()
