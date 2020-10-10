@@ -16,28 +16,18 @@ from webdriver_manager.firefox import GeckoDriverManager
 CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
 YOUTUBE_BASE_URL = "https://www.youtube.com/"
 
-options = Options()
-options.headless = True
-# driver = webdriver.Chrome(executable_path=ChromeDriverManager.install(), chrome_options=options)
-driver = webdriver.Firefox(
-    executable_path=GeckoDriverManager().install(), options=options
-)
-channel_url = ""
-channelName = ""
-
 
 def make_soup(url):
     try:
         response = requests.get(url)
         return BeautifulSoup(response.content, "html.parser")
-    except:
-        print("An error occurred. Cannot proceed...")
-        exit(-1)
+    except Exception as e:
+        print(f"An error occurred. Cannot proceed... {repr(e)}")
 
 
 def validate_channel_url(link):
-    global driver
-
+    if link is None:
+        return False
     if (
         re.match(
             r"^((http|https)://)(www\.)youtube\.com/(channel/|user/|c/)[a-zA-Z0-9\-]+$",
@@ -48,13 +38,11 @@ def validate_channel_url(link):
         print("Wrong channel URL")
         print("Try including the whole URL starting by http/https...")
         return False
-
     try:
         driver.get(link)
     except TimeoutException:
         print("This is taking too long, unable to proceed...")
         driver.quit()
-        exit(-1)
 
     if driver.current_url == "https://www.youtube.com/error?src=404":
         print("Non existent channel")
@@ -63,15 +51,13 @@ def validate_channel_url(link):
 
 
 def get_channel_from_user():
-    global channel_url
-    channel_url = input("Enter the channel's url: ").strip()
+    channel_url = None
     while not validate_channel_url(channel_url):
         channel_url = input("Enter the channel's url: ").strip()
     return channel_url
 
 
 def retrieve_all_videos(link):
-    global driver
     link = link.strip("/") + "/videos"
     try:
         driver.get(link)
@@ -115,40 +101,50 @@ def retrieve_all_videos(link):
         return videos_urls
     except ConnectionRefusedError:
         print("External connection occurred. Try again later.")
-        exit(-1)
 
 
-def download_video(video_link):
+def download_video(video_link, api_key=None):
+    """
+    :param video_link:
+    :param api_key:
+    :return:
+
+    Specifying an API key is optional
+    , as pafy includes one. However,
+    it is preferred that software calling pafy provides it’s own API key,
+    and the default may be removed in the future.
+    """
     try:
-
-        # Specifying an API key is optional
-        # , as pafy includes one. However,
-        # it is preferred that software calling pafy provides it’s own API key,
-        # and the default may be removed in the future.
-        pafy.set_api_key(yourApiKey)
+        if api_key is not None:
+            pafy.set_api_key(api_key)
         youtube_video = pafy.new(video_link)
 
         stream = youtube_video.getbest(preftype="mp4")
         stream.download()
         print(youtube_video.title, " downloaded...")
-    except OSError:  # if the video is labeled as private, then an error would occur and we won't be able to extract it
+    except OSError:
         pass
 
 
 def main():
-    global channel_url
-    global channelName
-    global driver
-    channel_url = get_channel_from_user().strip("/")
-    try:
-        channelName = make_soup(channel_url).get("title")
+    options = Options()
+    options.headless = True
+    # driver = webdriver.Chrome(executable_path=ChromeDriverManager.install(), chrome_options=options)
+    driver = webdriver.Firefox(
+        executable_path=GeckoDriverManager().install(), options=options
+    )
+    channel_url = ""
+    channelName = ""
 
+    channel_url = get_channel_from_user()
+    try:
+        channel_name = make_soup(channel_url).get("title")
     except TimeoutException:
         print("This is taking too long, unable to proceed...")
-        exit(-1)
+        return 1
 
-    channelName = driver.title.replace("- YouTube", "").strip()
-    print("Channel ", channelName, " retrieved successfully....")
+    channel_name = driver.title.replace("- YouTube", "").strip()
+    print("Channel ", channel_name, " retrieved successfully....")
     all_videos_urls = retrieve_all_videos(channel_url)
 
     print("Channel contains ", len(all_videos_urls), " videos.")
@@ -159,18 +155,17 @@ def main():
 
     if user_choice.upper() == "N":
         print("Ciao")
-        exit(0)
     else:
-        if os.path.exists(channelName):
-            shutil.rmtree(channelName)  # delete directory with its contents
-        os.mkdir(channelName)
-        os.chdir(channelName)
-        for videoUrl in all_videos_urls:
-            download_video(videoUrl)
+        if os.path.exists(channel_name):
+            shutil.rmtree(channel_name)
+        os.mkdir(channel_name)
+        os.chdir(channel_name)
+        for video_url in all_videos_urls:
+            download_video(video_url)
 
-        driver.quit()
+    driver.quit()
+    print("Finished!")
 
-        print("Finished!")
 
-
-main()
+if __name__ == "__main__":
+    main()
