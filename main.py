@@ -31,8 +31,7 @@ channelName = ''
 def make_soup(url):
     try:
         response = requests.get(url)
-        soupdata = BeautifulSoup(response.content, "html.parser")
-        return soupdata
+        return BeautifulSoup(response.content, "html.parser")
     except:
         print("An error occured. Cannot proceed...")
         exit(-1)
@@ -151,21 +150,14 @@ def main():
         print("Ciao")
         exit(0)
     else:
-        if not os.path.exists(channelName):
-            os.mkdir(channelName)
-            os.chdir(channelName)
-            for videoUrl in allVideosUrls:
-                downloadVideo(videoUrl)
-
-            driver.quit()
-
-        else:
+        if os.path.exists(channelName):
             shutil.rmtree(channelName)  # delete directory with its contents
-            os.mkdir(channelName)
-            os.chdir(channelName)
-            for videoUrl in allVideosUrls:
-                downloadVideo(videoUrl)
-            driver.quit()
+        os.mkdir(channelName)
+        os.chdir(channelName)
+        for videoUrl in allVideosUrls:
+            downloadVideo(videoUrl)
+
+        driver.quit()
 
         print("Finished!")
 
