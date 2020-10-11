@@ -1,44 +1,40 @@
-import os
+"""
+Describe here what your program does.
+"""
+
+import json
 import re
 import shutil
 import time
-from urllib.parse import urljoin
+from itertools import count
+from pathlib import Path
+from typing import Any, Optional
 
 import pafy
-import requests
-from itertools import count
-from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
-
-# from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.chrome.options import Options
-
-# from webdriver_manager.firefox import GeckoDriverManager
 from webdriver_manager.chrome import ChromeDriverManager
 
 CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
 YOUTUBE_BASE_URL = "https://www.youtube.com"
+YOUTUBE_404 = "https://www.youtube.com/error?src=404"
+CHANNEL_URL = re.compile(
+    r"^((http|https)://)(www\.)youtube\.com/(channel/|user/|c/)[a-zA-Z0-9\-]+$"
+)
+PAFY_API = Path.home() / ".pafy-api.json"
 
 
-def make_soup(url):
-    try:
-        response = requests.get(url)
-        return BeautifulSoup(response.content, "html.parser")
-    except Exception as e:
-        print(f"An error occurred. Cannot proceed... {repr(e)}")
+def validate_channel_url(link: str) -> bool:
+    """
+    Validate the channel url.
 
-
-def validate_channel_url(link):
+    :param link:
+    :return: True if channel url is valid
+    """
     if link is None:
         return False
-    if (
-        re.match(
-            r"^((http|https)://)(www\.)youtube\.com/(channel/|user/|c/)[a-zA-Z0-9\-]+$",
-            link,
-        )
-        is None
-    ):
+    if not CHANNEL_URL.match(link):
         print("Wrong channel URL")
         print("Try including the whole URL starting by http/https...")
         return False
@@ -46,63 +42,64 @@ def validate_channel_url(link):
         driver.get(link)
     except TimeoutException:
         print("This is taking too long, unable to proceed...")
-        driver.quit()
+        return False
 
-    if driver.current_url == "https://www.youtube.com/error?src=404":
+    if driver.current_url == YOUTUBE_404:
         print("Non existent channel")
         return False
     return True
 
 
-def get_channel_from_user():
+def get_channel_from_user() -> str:
+    """
+    Retrieve channel url from user via standard input
+    :return:
+    """
     channel_url = None
     while not validate_channel_url(channel_url):
         channel_url = input("Enter the channel's url: ").strip()
     return channel_url
 
 
-def retrieve_all_videos(link):
-    link = urljoin(link, "videos")
+def retrieve_all_videos(link: str) -> list[str]:
+    """
+    Retrieve all video links from a given youtube channel url
+    """
+    link += "/videos"
     try:
         driver.get(link)
         time.sleep(5)
         scroll_pause_time = 1
-        screen_height = driver.execute_script(
-            "return window.screen.height;"
-        )
-
-        for i in count(1):
-            driver.execute_script(
-                "window.scrollTo(0, {screen_height}*{i});".format(
-                    screen_height=screen_height, i=i
-                )
-            )
+        screen_height = driver.execute_script("return window.screen.height;")
+        for index in count(1):
+            driver.execute_script(f"window.scrollTo(0, {screen_height}*{index});")
             time.sleep(scroll_pause_time)
             scroll_height = driver.execute_script(
                 "return document.documentElement.scrollHeight"
             )
-            if screen_height * i > scroll_height:
+            if screen_height * index > scroll_height:
                 break
 
-        videos_page_soup = BeautifulSoup(driver.page_source, "html.parser")
-        all_a_tags = videos_page_soup.findAll("a", attrs={"id": "thumbnail"})
         return [
-            urljoin(YOUTUBE_BASE_URL, href)
-            for tag in all_a_tags
-            if (href := tag.get("href"))
+            url
+            for tag in driver.find_elements_by_css_selector("#video-title")
+            if (url := tag.get_attribute("href"))
         ]
     except ConnectionRefusedError:
         print("External connection occurred. Try again later.")
+        return []
 
 
-def download_video(video_link, api_key=None):
+def download_video(
+    video_link: str, video_dir: Path, api_key: Optional[str] = None
+) -> None:
     """
     :param video_link:
+    :param video_dir:
     :param api_key:
     :return:
 
-    Specifying an API key is optional
-    , as pafy includes one. However,
+    Specifying an API key is optional, as pafy includes one. However,
     it is preferred that software calling pafy provides it’s own API key,
     and the default may be removed in the future.
     """
@@ -112,49 +109,79 @@ def download_video(video_link, api_key=None):
         youtube_video = pafy.new(video_link)
 
         stream = youtube_video.getbest(preftype="mp4")
-        stream.download()
+        # https://github.com/mps-youtube/pafy/blob/develop/pafy/backend_shared.py#L630
+        stream.download(video_dir)
         print(youtube_video.title, " downloaded...")
     except OSError:
         pass
 
 
-def main(api_key=None):
+def ask(question: str, choices: dict[str, Any] = None) -> Any:
+    """
+    Function to ask the user a question.
+    The choices are the keys of the mapping.
+    The return value is the mapping to the key
+
+    :param question: Message shown to user
+    :param choices: Mapping choice : return value
+    :return:
+    """
+    if choices is None:
+        choices = {"Y": True, "N": False}
+    while (choice := input(question).upper()) not in choices:
+        print("Invalid input:", choice)
+        print("Please choose:", ", ".join(choices))
+    return choices[choice]
+
+
+def get_pafy_api_key() -> Optional[str]:
+    """
+    Function to obtain API Key for pafy
+    :return:
+    """
+    if PAFY_API.exists():
+        print("Reading pafy api_key from", PAFY_API)
+        data = json.loads(PAFY_API.read_text())
+    else:
+        data = {"API_KEY": input("Please input pafy_api_key (leve empty for None): ")}
+        print("Writing api_key to", PAFY_API)
+        PAFY_API.write_text(json.dumps(data))
+    return data.get("API_KEY")
+
+
+def main(api_key: Optional[str] = None):
     channel_url = get_channel_from_user()
     try:
-        channel_name = make_soup(channel_url).get("title")
+        driver.get(channel_url)
+        channel_name = driver.title.removesuffix(" - YouTube")
     except TimeoutException:
         print("This is taking too long, unable to proceed...")
         return 1
 
-    print("Channel ", channel_name, " retrieved successfully....")
+    print(f"Channel {channel_name} retrieved successfully....")
+
     all_videos_urls = retrieve_all_videos(channel_url)
+    print(f"Channel contains {len(all_videos_urls)} videos.")
 
-    print("Channel contains ", len(all_videos_urls), " videos.")
-    user_choice = input("Want to download them all or abort? Y/N ")
-
-    while user_choice.upper() not in ["Y", "N"]:
-        user_choice = input("Wrong choice. Download all or abort ? Y/N ")
-
-    if user_choice.upper() == "N":
+    if not ask("Want to download them all or abort? Y/N "):
         print("Ciao")
     else:
-        if os.path.exists(channel_name):
-            shutil.rmtree(channel_name)
-        os.mkdir(channel_name)
-        os.chdir(channel_name)
+        channel_directory = Path(channel_name)
+        if channel_directory.exists() and ask(
+            f"Channel directory {channel_directory} exists. Delete it? "
+        ):
+            shutil.rmtree(channel_directory)
+        channel_directory.mkdir(exist_ok=True)
         for video_url in all_videos_urls:
-            download_video(video_url, api_key=None)
+            download_video(video_url, video_dir=channel_directory, api_key=api_key)
 
-    driver.quit()
     print("Finished!")
 
 
 if __name__ == "__main__":
+    pafy_api_key = get_pafy_api_key()
     options = Options()
     options.headless = True
-    driver = webdriver.Chrome(
-        executable_path=ChromeDriverManager().install(), options=options
-    )
-    # todo: ApyKey from json file
-    #       testing
-    main()
+    chrome_exe = ChromeDriverManager().install()
+    with webdriver.Chrome(executable_path=chrome_exe, options=options) as driver:
+        main(api_key=pafy_api_key)
